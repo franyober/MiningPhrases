@@ -92,8 +92,16 @@ def on_add_to_anki():
         messagebox.showwarning("Advertencia", "Por favor, asegúrate de que ambos campos (frase y significado) estén llenos.")
         return
     
-    deck_name = "Default"  # Cambia esto al nombre de tu mazo en Anki
+    deck_name = "English"  # Cambia esto al nombre de tu mazo en Anki
     add_to_anki(deck_name, phrase, word, meaning)
+    clear_fields()
+
+def clear_fields():
+    # Borra el contenido de los widgets Text (para multislots)
+    phrase_entry.delete("1.0", tk.END)
+    meaning_entry.delete("1.0", tk.END)
+    word_entry.delete("1.0", tk.END)
+
 
 def paste_from_clipboard():
     try:
