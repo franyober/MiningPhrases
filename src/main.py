@@ -50,7 +50,7 @@ def fetch_meaning():
     
     # Construcción del mensaje
     if word:
-        content = f"What does '{word}' mean in the context of the following sentence: '{phrase}'?"
+        content = f"What does '{word}' mean in the context of the following sentence in a concise way: '{phrase}'?"
     else:
         content = f"What does the following sentence mean in a concise and clear way: '{phrase}'?"
     
