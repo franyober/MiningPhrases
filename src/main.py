@@ -20,7 +20,7 @@ def anki_connect(action, **params):
     response = requests.post(ANKI_CONNECT_URL, data=json.dumps(request))
     return response.json()
 
-def add_to_anki(deck_name, sentence, word, definition):
+def add_to_anki(deck_name, sentence, word, definition, tag):
     # Asegúrate de que el mazo existe
     anki_connect('createDeck', deck=deck_name)
     
@@ -33,6 +33,7 @@ def add_to_anki(deck_name, sentence, word, definition):
             "Word": word,
             "Definition": definition
         },
+        "tags": tag,
         "options": {
             "allowDuplicate": False
         }
@@ -64,9 +65,9 @@ def fetch_meaning():
         - Sentence: "{phrase}"
         {f"- Source: {source}" if source else ""}
         Answer concisely in English :
-        1. Meaning in this context (max 20 words).
+        1. Meaning in this context (max 15 words).
         2. Is it noun/verb/adjective/idiom/phrasal verb/slang? (1 word).
-        3. Example in another simple sentence (max 20 words).
+        3. Example in another simple sentence (max 15 words).
     """
 
     if not phrase:
@@ -98,13 +99,14 @@ def on_add_to_anki():
     phrase = phrase_entry.get("1.0", tk.END).strip()
     meaning = meaning_entry.get("1.0", tk.END).strip()
     word = word_entry.get("1.0", tk.END).strip()
+    tag = source_entry.get("1.0", tk.END).strip()
     
     if not phrase or not meaning:
         messagebox.showwarning("Advertencia", "Por favor, asegúrate de que ambos campos (frase y significado) estén llenos.")
         return
     
     deck_name = "English"  # Cambia esto al nombre de tu mazo en Anki
-    add_to_anki(deck_name, phrase, word, meaning)
+    add_to_anki(deck_name, phrase, word, meaning, tag)
     clear_fields()
 
 def clear_fields():
@@ -112,6 +114,7 @@ def clear_fields():
     phrase_entry.delete("1.0", tk.END)
     meaning_entry.delete("1.0", tk.END)
     word_entry.delete("1.0", tk.END)
+    source_entry.delete("1.0", tk.END)
 
 
 def paste_from_clipboard():
@@ -145,7 +148,7 @@ word_entry.pack()
 # Cuadro de texto para contexto
 source_label = tk.Label(root, text="Fuente:")
 source_label.pack()
-source_entry = tk.Text(root, height=2, width=50)
+source_entry = tk.Entry(root, width=50)
 source_entry.pack()
 
 # Botón para iniciar la consulta
