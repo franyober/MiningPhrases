@@ -3,12 +3,15 @@ from tkinter import messagebox
 import pyperclip
 import requests
 import json
-from dotenv import dotenv_values
+from dotenv import load_dotenv
+import os
+import google.generativeai as genai
 
-config = dotenv_values(".env")
+load_dotenv()  # take environment variables
 
-API = config["API"]
-modelo = "llama-3.3-70b-versatile"
+gemini_key = os.getenv('GEMINI_KEY_API')
+
+modelo = "gemini-2.0-flash"
 # Configuración de Anki Connect
 ANKI_CONNECT_URL = "http://localhost:8765"
 
@@ -43,44 +46,52 @@ def add_to_anki(deck_name, sentence, word, definition):
 def fetch_meaning():
     phrase = phrase_entry.get("1.0", tk.END).strip()
     word = word_entry.get("1.0", tk.END).strip()
+    source= source_entry.get("1.0",tk.END).strip()
+
+    prompt1 = f"""
+        I'm learning English through movies/series. Explain the meaning of '{word}' in this context:
+        - Sentence: "{phrase}"
+        {f"- Source: {source}" if source else ""}
+        Answer concisely in English :
+        1. Meaning in this context (max 15 words).
+        2. Is it noun/verb/adjective/idiom/phrasal verb/slang? (1 word).
+        3. Example in another simple sentence (max 15 words).
     
+    """
+
+    prompt2 = f"""
+        I'm learning English through movies/series. Explain the meaning of this:
+        - Sentence: "{phrase}"
+        {f"- Source: {source}" if source else ""}
+        Answer concisely in English :
+        1. Meaning in this context (max 20 words).
+        2. Is it noun/verb/adjective/idiom/phrasal verb/slang? (1 word).
+        3. Example in another simple sentence (max 20 words).
+    """
+
     if not phrase:
         messagebox.showwarning("Advertencia", "Por favor, copia una frase al portapapeles.")
         return
     
     # Construcción del mensaje
     if word:
-        content = f"What does '{word}' mean in the context of the following sentence in a concise way: '{phrase}'?"
+        content = prompt1
     else:
-        content = f"What does the following sentence mean in a concise and clear way: '{phrase}'?"
-    
-    # Llamada a la API de GroqCloud
-    api_url = "https://api.groq.com/openai/v1/chat/completions"  # Endpoint de GroqCloud
-    headers = {
-        "Authorization": f"Bearer {API}",  # Reemplaza con tu clave
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": modelo,  # Modelo soportado por GroqCloud
-        "messages": [
-            {"role": "user", "content": content}
-        ],
-        "max_tokens": 100,
-        "temperature": 0.7
-    }
-    
+        content = prompt2
+
+    genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel('gemini-2.0-flash')
     try:
-        response = requests.post(api_url, headers=headers, json=data)
-        if response.status_code == 200:
+        response = model.generate_content(content,
+            generation_config=genai.types.GenerationConfig(
+            temperature=0.2,
+            top_p=0.3)
+            )
             # Acceder a la respuesta generada
-            completion = response.json().get("choices", [{}])[0].get("message", {}).get("content", "No se pudo obtener el significado.")
-            meaning_entry.delete("1.0", tk.END)
-            meaning_entry.insert("1.0", completion.strip())
-        else:
-            error_message = response.json().get("error", {}).get("message", "Error desconocido.")
-            messagebox.showerror("Error", f"No se pudo obtener el significado: {error_message}")
+        meaning_entry.delete("1.0", tk.END)
+        meaning_entry.insert("1.0", response.text)
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo conectar con la API de GroqCloud: {e}")
+        messagebox.showerror("Error", f"No se pudo conectar con la API: {e}")
 
 
 def on_add_to_anki():
@@ -131,6 +142,12 @@ word_label.pack()
 word_entry = tk.Text(root, height=2, width=50)
 word_entry.pack()
 
+# Cuadro de texto para contexto
+source_label = tk.Label(root, text="Fuente:")
+source_label.pack()
+source_entry = tk.Text(root, height=2, width=50)
+source_entry.pack()
+
 # Botón para iniciar la consulta
 fetch_button = tk.Button(root, text="Obtener Significado", command=fetch_meaning)
 fetch_button.pack()
@@ -138,7 +155,7 @@ fetch_button.pack()
 # Cuadro de texto para el significado
 meaning_label = tk.Label(root, text="Significado:")
 meaning_label.pack()
-meaning_entry = tk.Text(root, height=5, width=50)
+meaning_entry = tk.Text(root, height=15, width=50)
 meaning_entry.pack()
 
 # Botón para agregar a Anki
