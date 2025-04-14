@@ -23,7 +23,7 @@ def anki_connect(action, **params):
 def add_to_anki(deck_name, sentence, word, definition, tag):
     # Asegúrate de que el mazo existe
     anki_connect('createDeck', deck=deck_name)
-    
+    tags = [tag.strip() for tag in tag.split(",")] if tag else []
     # Añade la tarjeta
     note = {
         "deckName": deck_name,
@@ -33,7 +33,7 @@ def add_to_anki(deck_name, sentence, word, definition, tag):
             "Word": word,
             "Definition": definition
         },
-        "tags": tag,
+        "tags": tags,
         "options": {
             "allowDuplicate": False
         }
@@ -148,7 +148,7 @@ word_entry.pack()
 # Cuadro de texto para contexto
 source_label = tk.Label(root, text="Fuente:")
 source_label.pack()
-source_entry = tk.Entry(root, width=50)
+source_entry = tk.Text(root, height=2,width=50)
 source_entry.pack()
 
 # Botón para iniciar la consulta
