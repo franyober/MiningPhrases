@@ -114,8 +114,7 @@ def clear_fields():
     phrase_entry.delete("1.0", tk.END)
     meaning_entry.delete("1.0", tk.END)
     word_entry.delete("1.0", tk.END)
-    source_entry.delete("1.0", tk.END)
-
+    
 
 def paste_from_clipboard():
     try:
