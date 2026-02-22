@@ -1,19 +1,21 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import threading
 from .anki_client import AnkiClient
 from .genai_client import GenAIClient
-from .utils import ImageUtils, get_clipboard_text
+from .utils import ImageUtils, get_clipboard_text, save_temp_file, play_audio
 from .config import ANKI_DECK_NAME
 
 class MiningApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Minado de Oraciones con Imágenes")
-        self.root.geometry("600x750")
+        self.root.title("Minado de Oraciones con Imágenes (Updated)")
+        self.root.geometry("600x850")
 
         self.anki_client = AnkiClient()
         self.genai_client = GenAIClient()
         self.image_path = None
+        self.audio_path = None
         self.img_tk = None
 
         self._setup_ui()
@@ -41,7 +43,12 @@ class MiningApp:
         self.source_text = tk.Text(input_frame, height=1, width=50)
         self.source_text.grid(row=6, column=0, columnspan=2, pady=5)
 
-        ttk.Button(input_frame, text="Obtener Significado", command=self.fetch_meaning).grid(row=7, column=0, columnspan=2, pady=10)
+        # Action Buttons for Fetching
+        fetch_frame = ttk.Frame(input_frame)
+        fetch_frame.grid(row=7, column=0, columnspan=2, pady=10)
+
+        self.fetch_btn = ttk.Button(fetch_frame, text="Obtener Todo (Significado + Img + Audio)", command=self.fetch_all)
+        self.fetch_btn.pack(side=tk.LEFT, padx=5)
 
         # Meaning Section
         meaning_frame = ttk.LabelFrame(main_frame, text="Significado", padding="10")
@@ -64,7 +71,17 @@ class MiningApp:
         self.img_label = ttk.Label(image_frame)
         self.img_label.pack(pady=5)
 
-        # Action Section
+        # Audio Section
+        audio_frame = ttk.LabelFrame(main_frame, text="Audio", padding="10")
+        audio_frame.pack(fill=tk.X, pady=5)
+
+        self.audio_status_label = ttk.Label(audio_frame, text="No hay audio generado.")
+        self.audio_status_label.pack(side=tk.LEFT, padx=5)
+
+        self.play_btn = ttk.Button(audio_frame, text="Reproducir Audio", command=self.play_audio_file, state=tk.DISABLED)
+        self.play_btn.pack(side=tk.LEFT, padx=5)
+
+        # Final Action Section
         action_frame = ttk.Frame(main_frame, padding="10")
         action_frame.pack(fill=tk.X)
 
@@ -108,7 +125,8 @@ class MiningApp:
             self.img_tk = ImageUtils.process_image_for_display(self.image_path)
             self.img_label.config(image=self.img_tk)
 
-    def fetch_meaning(self):
+    def fetch_all(self):
+        """Fetch meaning, image, and audio in a thread to keep UI responsive."""
         phrase = self.phrase_text.get("1.0", tk.END).strip()
         word = self.word_text.get("1.0", tk.END).strip()
         source = self.source_text.get("1.0", tk.END).strip()
@@ -117,18 +135,60 @@ class MiningApp:
             messagebox.showwarning("Advertencia", "Por favor, ingresa una frase.")
             return
 
-        # Show loading indicator (simple cursor change)
         self.root.config(cursor="wait")
-        self.root.update()
+        self.fetch_btn.config(state=tk.DISABLED)
 
+        # Run in separate thread
+        threading.Thread(target=self._fetch_task, args=(word, phrase, source)).start()
+
+    def _fetch_task(self, word, phrase, source):
         try:
+            # 1. Meaning
             meaning = self.genai_client.generate_meaning(word, phrase, source)
-            self.meaning_text.delete("1.0", tk.END)
-            self.meaning_text.insert("1.0", meaning)
+
+            # 2. Image
+            img_bytes = self.genai_client.generate_image_bytes(word, phrase)
+            img_path = None
+            if img_bytes:
+                img_path = save_temp_file(img_bytes, ".png")
+
+            # 3. Audio
+            aud_bytes = self.genai_client.generate_audio_bytes(word)
+            aud_path = None
+            if aud_bytes:
+                aud_path = save_temp_file(aud_bytes, ".wav")
+
+            # Update UI on main thread
+            self.root.after(0, self._update_ui_after_fetch, meaning, img_path, aud_path)
+
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
         finally:
-            self.root.config(cursor="")
+            self.root.after(0, lambda: self.root.config(cursor=""))
+            self.root.after(0, lambda: self.fetch_btn.config(state=tk.NORMAL))
+
+    def _update_ui_after_fetch(self, meaning, img_path, aud_path):
+        # Update Meaning
+        self.meaning_text.delete("1.0", tk.END)
+        self.meaning_text.insert("1.0", meaning)
+
+        # Update Image
+        if img_path:
+            self.image_path = img_path
+            self._update_image_preview()
+
+        # Update Audio
+        if aud_path:
+            self.audio_path = aud_path
+            self.audio_status_label.config(text="Audio generado correctamente.")
+            self.play_btn.config(state=tk.NORMAL)
+        else:
+            self.audio_status_label.config(text="No se pudo generar audio.")
+            self.play_btn.config(state=tk.DISABLED)
+
+    def play_audio_file(self):
+        if self.audio_path:
+            play_audio(self.audio_path)
 
     def add_to_anki(self):
         phrase = self.phrase_text.get("1.0", tk.END).strip()
@@ -147,7 +207,8 @@ class MiningApp:
             word=word,
             definition=meaning,
             tags=tags,
-            image_path=self.image_path
+            image_path=self.image_path,
+            audio_path=self.audio_path
         )
 
         if result.get('error'):
@@ -162,6 +223,9 @@ class MiningApp:
         self.source_text.delete("1.0", tk.END)
         self.meaning_text.delete("1.0", tk.END)
         self.remove_image()
+        self.audio_path = None
+        self.audio_status_label.config(text="No hay audio generado.")
+        self.play_btn.config(state=tk.DISABLED)
 
 def run():
     root = tk.Tk()
