@@ -47,7 +47,7 @@ class MiningApp:
         fetch_frame = ttk.Frame(input_frame)
         fetch_frame.grid(row=7, column=0, columnspan=2, pady=10)
 
-        self.fetch_btn = ttk.Button(fetch_frame, text="Obtener Todo (Significado + Img + Audio)", command=self.fetch_all)
+        self.fetch_btn = ttk.Button(fetch_frame, text="Obtener Todo (Significado + Audio)", command=self.fetch_all)
         self.fetch_btn.pack(side=tk.LEFT, padx=5)
 
         # Meaning Section
@@ -146,20 +146,14 @@ class MiningApp:
             # 1. Meaning
             meaning = self.genai_client.generate_meaning(word, phrase, source)
 
-            # 2. Image
-            img_bytes = self.genai_client.generate_image_bytes(word, phrase)
-            img_path = None
-            if img_bytes:
-                img_path = save_temp_file(img_bytes, ".png")
-
-            # 3. Audio
+            # 2. Audio
             aud_bytes = self.genai_client.generate_audio_bytes(word)
             aud_path = None
             if aud_bytes:
                 aud_path = save_temp_file(aud_bytes, ".wav")
 
             # Update UI on main thread
-            self.root.after(0, self._update_ui_after_fetch, meaning, img_path, aud_path)
+            self.root.after(0, self._update_ui_after_fetch, meaning, aud_path)
 
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
@@ -167,15 +161,10 @@ class MiningApp:
             self.root.after(0, lambda: self.root.config(cursor=""))
             self.root.after(0, lambda: self.fetch_btn.config(state=tk.NORMAL))
 
-    def _update_ui_after_fetch(self, meaning, img_path, aud_path):
+    def _update_ui_after_fetch(self, meaning, aud_path):
         # Update Meaning
         self.meaning_text.delete("1.0", tk.END)
         self.meaning_text.insert("1.0", meaning)
-
-        # Update Image
-        if img_path:
-            self.image_path = img_path
-            self._update_image_preview()
 
         # Update Audio
         if aud_path:
