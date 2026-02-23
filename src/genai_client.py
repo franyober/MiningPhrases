@@ -4,7 +4,7 @@ import base64
 import wave
 import io
 import os
-from .config import GEMINI_API_KEY, GEMINI_MODEL, IMAGEN_MODEL, TTS_MODEL
+from .config import GEMINI_API_KEY, GEMINI_MODEL, TTS_MODEL
 
 class GenAIClient:
     def __init__(self, api_key: str = GEMINI_API_KEY):
@@ -13,7 +13,6 @@ class GenAIClient:
         self.client = genai.Client(api_key=api_key)
         self.model = GEMINI_MODEL
         # Use appropriate models from config
-        self.imagen_model = IMAGEN_MODEL
         self.tts_model = TTS_MODEL
 
     def generate_meaning(self, word: str, context: str, source: str = "") -> str:
@@ -33,26 +32,6 @@ class GenAIClient:
             return response.text
         except Exception as e:
             return f"Error API: {str(e)}"
-
-    def generate_image_bytes(self, word: str, context: str) -> bytes:
-        """Generates an image for the word in context."""
-        prompt = f"A realistic illustration of '{word}' in the context of: '{context}'. No text in image."
-        try:
-            response = self.client.models.generate_images(
-                model=self.imagen_model,
-                prompt=prompt,
-                config=types.GenerateImageConfig(
-                    number_of_images=1,
-                )
-            )
-            # Access generated_images[0].image.image_bytes
-            # The structure is response.generated_images[0].image.image_bytes
-            # Note: Verify if image_bytes is bytes or base64 string.
-            # Usually in Python SDK it is bytes.
-            return response.generated_images[0].image.image_bytes
-        except Exception as e:
-            print(f"Image generation error: {e}")
-            return None
 
     def generate_audio_bytes(self, text: str) -> bytes:
         """Generates audio (WAV) for the given text using Gemini TTS."""
